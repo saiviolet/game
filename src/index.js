@@ -24,7 +24,6 @@ window.addEventListener('load', () => {
           //удалить 1 элемент, который начинается с индекса
           this.game.keys.splice(this.game.keys.indexOf(evt.key), 1);
         };
-        console.log(this.game.keys);
       })
 
     }
@@ -98,8 +97,35 @@ window.addEventListener('load', () => {
   };
   //основной для врагов
   class Enemy {
-
+    constructor(game) {
+      this.game = game;
+      this.x = this.game.width;
+      this.speedX = Math.random() * -1.5 - 0.5;
+      this.forDelete = false;
+      this.lives = 5;
+      this.score = this.lives;
+    }
+    update() {
+      this.x += this.speedX;
+      if(this.x + this.width < 0) this.forDelete = true;
+    }
+    draw(context) {
+      context.fillStyle = 'red';
+      context.fillRect(this.x, this.y, this.width, this.height);
+      context.fillStyle = 'black';
+      context.font = '20px Helvetica';
+      context.fillText(this.lives, this.x, this.y);
+    }
   };
+
+  class Evil1 extends Enemy {
+    constructor(game) {
+      super(game);
+      this.width = 228 * .3;
+      this.height= 169 * .3;
+      this.y = Math.random() * (this.game.height * .9 - this.height);
+    }
+  }
   //фоновые слои
   class Layer {
 
@@ -118,9 +144,13 @@ window.addEventListener('load', () => {
     }
 
     draw(context) {
+      //отображение счета
+      context.font = this.fontSize + 'px ' + this.fontFamily;
+      context.fillText('Счет: ' + this.game.score, 20, 40);
+      // отображение количества снарядов
       context.fillStyle = this.color;
       for(let i = 0; i < this.game.ammo; i++) {
-        context.fillRect(20,50,3,20);
+        context.fillRect(20 + 5 * i,50,3,20);
       }
     }
   };
@@ -133,11 +163,16 @@ window.addEventListener('load', () => {
       this.input = new InputHAndler(this);
       this.ui = new UI(this);
       this.keys = [];
+      this.enemies = [];
       this.ammo = 20;
       this.maxAmmo = 40;
       this.ammoTimer = 0;
       this.ammoInterval = 500;
-
+      this.enemyTimer = 0;
+      this.enemyInterval = 1000;
+      this.gameOver = false;
+      this.score = 0;
+      this.winningScore = 10;
     }
     update(deltaTime) {
       this.player.update();
@@ -148,9 +183,48 @@ window.addEventListener('load', () => {
       else {
         this.ammoTimer += deltaTime;
       }
+      this.enemies.forEach(enemy => {
+        enemy.update();
+        if(this.checkCollision(this.player, enemy)) {
+          enemy.forDelete = true;
+        }
+        this.player.projectiles.forEach(pr => {
+          if( this.checkCollision(pr, enemy)) {
+            enemy.lives--;
+            pr.forDelete = true;
+            if(enemy.lives <= 0) {
+              enemy.forDelete = true;
+              this.score += enemy.score;
+              if (this.score >= this.winningScore) this.gameOver = true;
+            }
+          }
+        })
+      });
+      this.enemies = this.enemies.filter(enemy => !enemy.forDelete);
+      if(this.enemyTimer > this.enemyInterval && !this.gameOver) {
+        this.addEnemy();
+        this.enemyTimer = 0;
+      }
+      else {
+        this.enemyTimer += deltaTime;
+      }
     }
     draw(context) {
-      this.player.draw(context)
+      this.player.draw(context);
+      this.ui.draw(context);
+      this.enemies.forEach(enemy => {
+        enemy.draw(context);
+      });
+    }
+    addEnemy() {
+      this.enemies.push(new Evil1(this));
+    }
+    // ф-ия обработки столкновений 2 объектов
+    checkCollision (obj1, obj2) {
+      return ( obj1.x < obj2.x + obj2.width &&
+              obj1.x + obj1.width > obj2.x &&
+              obj1.y < obj2.y + obj2.height &&
+              obj1.y + obj1.height > obj2.y )
     }
   }
   //создаем игру класса игра и передаем размеры нашего канваса
@@ -168,5 +242,5 @@ window.addEventListener('load', () => {
     //встроенная функция для перерисовки
     requestAnimationFrame(animate);
   }
-  animate();
+  animate(0);
 })
